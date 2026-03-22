@@ -16,4 +16,9 @@ def test_analyze() -> None:
     payload = {"file_name": "demo.py", "code": "print('hello')"}
     response = client.post("/api/pipeline/analyze", json=payload)
     assert response.status_code == 200
-    assert "ir" in response.json()
+    body = response.json()
+    assert "ir" in body
+    assert "code_explanation" in body
+    assert isinstance(body["code_explanation"], str)
+    assert "llm_call_sites" in body
+    assert isinstance(body["llm_call_sites"], list)

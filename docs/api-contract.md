@@ -12,6 +12,8 @@
   - `issues: Issue[]`
   - `metrics_before: Metrics`
   - `parser_notes: string[]`
+  - `code_explanation: string` — Markdown narrative of the file (LLM when `OPENROUTER_API_KEY` is set; otherwise a heuristic IR summary).
+  - `llm_analysis_used: boolean`
 
 ## `POST /api/pipeline/optimize`
 - Request:

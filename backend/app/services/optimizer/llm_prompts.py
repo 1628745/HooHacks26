@@ -87,6 +87,41 @@ Answer the user's latest request. If you provide new code, put the complete file
 """
 
 
+def build_analyze_code_explanation_prompt(
+    file_name: str,
+    code: str,
+    ir: PipelineIR,
+) -> str:
+    """Prompt for /analyze: explain each piece of a LangChain-style Python file."""
+    ir_payload = {
+        "nodes": [n.model_dump() for n in ir.nodes],
+        "edges": [e.model_dump() for e in ir.edges],
+    }
+    code_block = code[:48000]
+    return f"""You are an expert on LangChain, LCEL, and Python LLM pipelines.
+
+The user uploaded a single Python file. Explain what the code does in plain language, **structured by logical pieces** of the pipeline (not line-by-line noise).
+
+File name: `{file_name}`
+
+Optional context — heuristic IR from an AST pass (order may not match source; use the actual code as ground truth):
+```json
+{json.dumps(ir_payload, indent=2)[:14000]}
+```
+
+SOURCE CODE:
+```python
+{code_block}
+```
+
+Write your answer in **Markdown** with:
+- A short **Overview** (2–4 sentences): what this script accomplishes end-to-end.
+- Then sections with `##` headings such as: **Imports & setup**, **Models / clients**, **Prompts & templates**, **Chains, agents, or invoke flow**, **Data flow between steps**, **Output / side effects** — only include sections that apply. If the file is not really LangChain, say so and describe what it does instead.
+- For each important step, state **purpose** and how it connects to the next part.
+
+Do not output Python code blocks unless you need a tiny illustrative snippet (prefer describing in prose)."""
+
+
 def _ir_issues_json(ir: PipelineIR, issues: list[Issue]) -> tuple[str, str]:
     issues_payload = [
         {

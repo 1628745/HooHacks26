@@ -48,7 +48,16 @@ class AnalyzeResponse(BaseModel):
     ir: PipelineIR
     issues: list[Issue]
     metrics_before: Metrics
+    llm_call_sites: list[str] = Field(
+        default_factory=list,
+        description="Invoke-style call sites counted toward llm_calls, in AST walk order.",
+    )
     parser_notes: list[str] = Field(default_factory=list)
+    code_explanation: str = Field(
+        default="",
+        description="Markdown-friendly narrative: what each part of the LangChain-style file does.",
+    )
+    llm_analysis_used: bool = False
 
 
 class OptimizeRequest(BaseModel):
@@ -64,6 +73,14 @@ class OptimizeResponse(BaseModel):
     explanation: str
     metrics_before: Metrics
     metrics_after: Metrics
+    llm_call_sites_before: list[str] = Field(
+        default_factory=list,
+        description="LLM invoke sites in the submitted file (same ordering as static analysis).",
+    )
+    llm_call_sites_after: list[str] = Field(
+        default_factory=list,
+        description="LLM invoke sites in the optimized file after parsing.",
+    )
     diff_hunks: list[str]
     llm_used: bool = False
     optimization_event_log: list[str] = Field(

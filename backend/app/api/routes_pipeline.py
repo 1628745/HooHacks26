@@ -18,9 +18,10 @@ from app.models.schemas import (
     ValidateResponse,
 )
 from app.services.analyzer.inefficiency_rules import detect_issues
+from app.services.analyzer.pipeline_explanation import fallback_code_explanation
 from app.services.extractor.pipeline_ir_builder import build_pipeline_ir
 from app.services.generator.code_rewriter import rewrite_code
-from app.services.metrics.estimator import estimate_metrics
+from app.services.metrics.estimator import estimate_metrics, extract_llm_call_sites
 from app.services.optimizer.emit_types import OptimizeEmitFn
 from app.services.optimizer.llm_optimizer import build_optimization_explanation
 from app.services.optimizer.multi_step_optimize import OptimizationExhausted, run_llm_optimize
@@ -67,7 +68,7 @@ def _execute_optimize(
     if openrouter_configured():
         _opt_log("OpenRouter configured — LLM path")
         try:
-            explanation, optimized_code, after = run_llm_optimize(
+            explanation, optimized_code, _after = run_llm_optimize(
                 generate_text,
                 payload.file_name,
                 payload.original_code,
@@ -99,20 +100,18 @@ def _execute_optimize(
         valid, errors = validate_python_syntax(optimized_code)
         if not valid:
             raise HTTPException(status_code=400, detail=f"Optimized code is invalid Python: {errors}")
-        adjusted_calls = max(
-            1,
-            before.llm_calls - len([i for i in issues if i.issue_type == "mergeable_steps"]),
-        )
-        after = before.model_copy(
-            update={
-                "llm_calls": adjusted_calls,
-                "token_estimate": max(100, int(before.token_estimate * 0.8)),
-                "energy_wh": round(adjusted_calls * 0.3, 3),
-            }
-        )
         explanation = build_optimization_explanation(issues)
         issues_applied_ids = [i.id for i in issues]
         llm_used = False
+
+    try:
+        parse_after = parse_code(optimized_code)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"Optimized code failed to parse: {exc}") from exc
+    ir_after = build_pipeline_ir(parse_after.tree)
+    after = estimate_metrics(ir_after)
+    llm_call_sites_before = extract_llm_call_sites(payload.ir)
+    llm_call_sites_after = extract_llm_call_sites(ir_after)
 
     diff_hunks = list(
         unified_diff(
@@ -132,6 +131,8 @@ def _execute_optimize(
         explanation=explanation,
         metrics_before=before,
         metrics_after=after,
+        llm_call_sites_before=llm_call_sites_before,
+        llm_call_sites_after=llm_call_sites_after,
         diff_hunks=diff_hunks,
         llm_used=llm_used,
         optimization_event_log=event_log,
@@ -148,11 +149,19 @@ def analyze_pipeline(payload: AnalyzeRequest) -> AnalyzeResponse:
     ir = build_pipeline_ir(parse_result.tree)
     issues = detect_issues(ir)
     metrics_before = estimate_metrics(ir)
+    llm_call_sites = extract_llm_call_sites(ir)
+    parser_notes = list(parse_result.notes)
+    code_explanation = fallback_code_explanation(ir)
+    llm_analysis_used = False
+
     return AnalyzeResponse(
         ir=ir,
         issues=issues,
         metrics_before=metrics_before,
-        parser_notes=parse_result.notes,
+        llm_call_sites=llm_call_sites,
+        parser_notes=parser_notes,
+        code_explanation=code_explanation,
+        llm_analysis_used=llm_analysis_used,
     )
 
 

@@ -43,7 +43,10 @@ export type AnalyzeResponse = {
   ir: PipelineIR
   issues: Issue[]
   metrics_before: Metrics
+  llm_call_sites: string[]
   parser_notes: string[]
+  code_explanation: string
+  llm_analysis_used: boolean
 }
 
 export type OptimizeRequest = {
@@ -59,6 +62,8 @@ export type OptimizeResponse = {
   explanation: string
   metrics_before: Metrics
   metrics_after: Metrics
+  llm_call_sites_before: string[]
+  llm_call_sites_after: string[]
   diff_hunks: string[]
   llm_used?: boolean
   optimization_event_log?: string[]

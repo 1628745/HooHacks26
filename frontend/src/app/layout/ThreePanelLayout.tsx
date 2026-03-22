@@ -4,10 +4,9 @@ type Props = {
   left: ReactNode
   middle: ReactNode
   right: ReactNode
-  bottom: ReactNode
 }
 
-export function ThreePanelLayout({ left, middle, right, bottom }: Props) {
+export function ThreePanelLayout({ left, middle, right }: Props) {
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -15,10 +14,9 @@ export function ThreePanelLayout({ left, middle, right, bottom }: Props) {
       </header>
       <main className="panels">
         <section className="panel">{left}</section>
-        <section className="panel">{middle}</section>
+        <section className="panel panel--center">{middle}</section>
         <section className="panel">{right}</section>
       </main>
-      <footer className="metrics">{bottom}</footer>
     </div>
   )
 }

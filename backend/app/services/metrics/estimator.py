@@ -1,6 +1,11 @@
 from app.models.schemas import Metrics, PipelineIR
 
 
+def extract_llm_call_sites(ir: PipelineIR) -> list[str]:
+    """Ordered labels of AST call nodes classified as LLM invocations (e.g. `.invoke`)."""
+    return [n.label for n in ir.nodes if n.node_type == "llm_call"]
+
+
 def estimate_metrics(ir: PipelineIR) -> Metrics:
     llm_calls = sum(1 for n in ir.nodes if n.node_type == "llm_call")
     if llm_calls == 0:

@@ -4,9 +4,8 @@ import { useState } from 'react'
 import { ThreePanelLayout } from './layout/ThreePanelLayout'
 import { OptimizationAssistantPanel } from '../features/assistant/OptimizationAssistantPanel'
 import { CodeEditorPanel } from '../features/code/CodeEditorPanel'
+import { PipelineCenterPanel } from '../features/center/PipelineCenterPanel'
 import { DiffPreviewModal } from '../features/diff/DiffPreviewModal'
-import { PipelineGraphPanel } from '../features/graph/PipelineGraphPanel'
-import { MetricsBar } from '../features/metrics/MetricsBar'
 import { FileUploadPanel } from '../features/upload/FileUploadPanel'
 import {
   analyzePipeline,
@@ -25,6 +24,7 @@ export default function App() {
     onSuccess: (data) => {
       store.setAnalysis(data)
       store.setOptimization(null)
+      store.setOptimizedFromCode(null)
       store.setOptimizePanelEntries([])
     },
   })
@@ -33,6 +33,7 @@ export default function App() {
     if (!store.analysis) {
       return
     }
+    const baselineCode = store.currentCode
     setOptimizePending(true)
     store.setOptimizePanelEntries([])
     try {
@@ -48,6 +49,7 @@ export default function App() {
           },
           onDone: (data) => {
             store.setOptimization(data)
+            store.setOptimizedFromCode(baselineCode)
             store.setShowDiff(true)
           },
           onFatal: (detail) => {
@@ -74,6 +76,7 @@ export default function App() {
                 store.setCurrentCode(content)
                 store.setAnalysis(null)
                 store.setOptimization(null)
+                store.setOptimizedFromCode(null)
                 store.setOptimizePanelEntries([])
               }}
             />
@@ -106,7 +109,26 @@ export default function App() {
             ) : null}
           </div>
         }
-        middle={<PipelineGraphPanel ir={store.analysis?.ir ?? null} issues={store.analysis?.issues ?? []} />}
+        middle={
+          <PipelineCenterPanel
+            fileName={store.fileName}
+            isAnalyzePending={analyze.isPending}
+            hasAnalysis={Boolean(store.analysis)}
+            leftCode={
+              store.optimization && store.optimizedFromCode != null
+                ? store.optimizedFromCode
+                : store.currentCode
+            }
+            rightCode={store.optimization?.optimized_code ?? store.currentCode}
+            hasOptimizationPreview={Boolean(store.optimization)}
+            metricsBefore={store.optimization?.metrics_before ?? store.analysis?.metrics_before}
+            metricsAfter={store.optimization?.metrics_after}
+            callSitesBefore={
+              store.optimization?.llm_call_sites_before ?? store.analysis?.llm_call_sites ?? []
+            }
+            callSitesAfter={store.optimization?.llm_call_sites_after}
+          />
+        }
         right={
           <OptimizationAssistantPanel
             issues={store.analysis?.issues ?? []}
@@ -117,14 +139,9 @@ export default function App() {
             onApplyCode={(code) => {
               store.setCurrentCode(code)
               store.setOptimization(null)
+              store.setOptimizedFromCode(null)
               store.setAnalysis(null)
             }}
-          />
-        }
-        bottom={
-          <MetricsBar
-            before={store.optimization?.metrics_before ?? store.analysis?.metrics_before}
-            after={store.optimization?.metrics_after}
           />
         }
       />

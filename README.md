@@ -3,7 +3,7 @@
 Hackathon demo tool for analyzing and optimizing single-file LangChain-style Python pipelines.
 
 ## Project Layout
-- `frontend`: React + TypeScript app (Monaco, React Flow, TanStack Query)
+- `frontend`: React + TypeScript app (Monaco, TanStack Query)
 - `backend`: FastAPI service (AST parser, IR extraction, issue analyzer, optimizer)
 - `samples`: demo Python files
 - `docs`: architecture and API notes
