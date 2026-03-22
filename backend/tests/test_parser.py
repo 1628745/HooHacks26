@@ -1,25 +1,19 @@
+from pathlib import Path
+
 from app.services.metrics.estimator import estimate_metrics
 from app.services.parser.ast_parser import parse_code
 from app.services.extractor.pipeline_ir_builder import build_pipeline_ir
 
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+_DEFAULT_PIPELINE = _REPO_ROOT / "samples" / "default_pipeline.py"
 
-def test_default_sample_counts_two_llm_invocations_not_constructor() -> None:
-    """ChatOpenAI() must not count as an llm_call (substring 'chat' false positive)."""
-    code = """
-from langchain.prompts import PromptTemplate
-from langchain.chat_models import ChatOpenAI
 
-model = ChatOpenAI(model="gpt-4o-mini")
-prompt_a = PromptTemplate.from_template("Summarize this text: {text}")
-prompt_b = PromptTemplate.from_template("Format summary as bullets")
-
-step1 = model.invoke(prompt_a.format(text=input_text))
-step2 = model.invoke(prompt_b.format(text=step1))
-print(step2)
-"""
+def test_default_sample_counts_llm_invocations_not_constructors() -> None:
+    """Only .invoke(...) counts as llm_call; ChatOpenAI() constructors do not."""
+    code = _DEFAULT_PIPELINE.read_text(encoding="utf-8")
     parsed = parse_code(code)
     ir = build_pipeline_ir(parsed.tree)
-    assert estimate_metrics(ir).llm_calls == 2
+    assert estimate_metrics(ir).llm_calls == 10
 
 
 def test_parser_and_ir_extract_calls() -> None:

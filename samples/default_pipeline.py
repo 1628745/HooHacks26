@@ -1,7 +1,4 @@
-import { useMemo, useState } from 'react'
-import type { AnalyzeResponse, OptimizeResponse } from '../api/types'
-
-const DEFAULT_SAMPLE = `"""
+"""
 Default demo pipeline for the LLM Pipeline Optimizer UI.
 
 This is a LangChain-style script with several ChatOpenAI "agents" (one model instance
@@ -54,43 +51,43 @@ SHARED_SYSTEM = (
 
 plan_prompt = PromptTemplate.from_template(
     SHARED_SYSTEM
-    + "\\n\\nBreak this user request into 3–5 concrete sub-tasks:\\n\\n{user_input}"
+    + "\n\nBreak this user request into 3–5 concrete sub-tasks:\n\n{user_input}"
 )
 
 research_prompt_a = PromptTemplate.from_template(
-    SHARED_SYSTEM + "\\n\\nList unknowns and search queries for:\\n\\n{plan}"
+    SHARED_SYSTEM + "\n\nList unknowns and search queries for:\n\n{plan}"
 )
 
 research_prompt_b = PromptTemplate.from_template(
-    SHARED_SYSTEM + "\\n\\nRefine the queries given partial notes:\\n\\n{notes}"
+    SHARED_SYSTEM + "\n\nRefine the queries given partial notes:\n\n{notes}"
 )
 
 draft_prompt = PromptTemplate.from_template(
-    "Write a short draft answer using:\\nPlan:\\n{plan}\\nNotes:\\n{notes}"
+    "Write a short draft answer using:\nPlan:\n{plan}\nNotes:\n{notes}"
 )
 
 critique_prompt = PromptTemplate.from_template(
-    "List issues and risks in this draft:\\n\\n{draft}"
+    "List issues and risks in this draft:\n\n{draft}"
 )
 
 ground_prompt = PromptTemplate.from_template(
-    "Which statements are unsupported by the ticket text?\\n\\nTicket:\\n{ticket}\\n\\nDraft:\\n{draft}"
+    "Which statements are unsupported by the ticket text?\n\nTicket:\n{ticket}\n\nDraft:\n{draft}"
 )
 
 summary_prompt = PromptTemplate.from_template(
-    "Summarize the critique and grounding in 5 bullets:\\n\\n{critique}\\n\\n{grounding}"
+    "Summarize the critique and grounding in 5 bullets:\n\n{critique}\n\n{grounding}"
 )
 
 format_prompt = PromptTemplate.from_template(
-    "Format as Markdown with ## headings:\\n\\n{summary}"
+    "Format as Markdown with ## headings:\n\n{summary}"
 )
 
 route_prompt_a = PromptTemplate.from_template(
-    "Choose branch: expand | finalize | escalate. Context:\\n\\n{context}"
+    "Choose branch: expand | finalize | escalate. Context:\n\n{context}"
 )
 
 route_prompt_b = PromptTemplate.from_template(
-    "Produce the final user-visible message from:\\n\\n{context}"
+    "Produce the final user-visible message from:\n\n{context}"
 )
 
 # ---------------------------------------------------------------------------
@@ -109,41 +106,10 @@ grounding = fact_checker.invoke(ground_prompt.format(ticket=user_input, draft=dr
 brief = summarizer.invoke(summary_prompt.format(critique=critique, grounding=grounding))
 markdown = formatter.invoke(format_prompt.format(summary=brief))
 
-route_context = SHARED_SYSTEM + "\\n\\n" + str(markdown)
+route_context = SHARED_SYSTEM + "\n\n" + str(markdown)
 branch = router.invoke(route_prompt_a.format(context=route_context))
 final_reply = router.invoke(
-    route_prompt_b.format(context=str(markdown) + "\\n\\n" + str(branch))
+    route_prompt_b.format(context=str(markdown) + "\n\n" + str(branch))
 )
 
 print(final_reply)
-`
-
-export function usePipelineStore() {
-  const [fileName, setFileName] = useState('pipeline.py')
-  const [originalCode, setOriginalCode] = useState(DEFAULT_SAMPLE)
-  const [currentCode, setCurrentCode] = useState(DEFAULT_SAMPLE)
-  const [analysis, setAnalysis] = useState<AnalyzeResponse | null>(null)
-  const [optimization, setOptimization] = useState<OptimizeResponse | null>(null)
-  const [showDiff, setShowDiff] = useState(false)
-
-  const canPreviewOptimization = useMemo(
-    () => Boolean(analysis?.ir.nodes.length),
-    [analysis?.ir.nodes.length],
-  )
-
-  return {
-    fileName,
-    setFileName,
-    originalCode,
-    setOriginalCode,
-    currentCode,
-    setCurrentCode,
-    analysis,
-    setAnalysis,
-    optimization,
-    setOptimization,
-    showDiff,
-    setShowDiff,
-    canPreviewOptimization,
-  }
-}
