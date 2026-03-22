@@ -2,7 +2,39 @@ import { useMutation } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { chatWithAssistant } from '../../lib/api/client'
+import { renderSimpleMarkdown } from '../../lib/markdown/renderSimpleMarkdown'
 import type { ChatMessage, Issue } from '../../lib/api/types'
+
+const SEVERITY_ORDER: Record<Issue['severity'], number> = { high: 0, medium: 1, low: 2 }
+
+type GroupedIssue = {
+  issue_type: string
+  title: string
+  severity: Issue['severity']
+  count: number
+  suggested_action: string
+}
+
+function groupIssuesByType(issues: Issue[]): GroupedIssue[] {
+  const byType = new Map<string, Issue[]>()
+  for (const issue of issues) {
+    const list = byType.get(issue.issue_type)
+    if (list) list.push(issue)
+    else byType.set(issue.issue_type, [issue])
+  }
+  return [...byType.values()]
+    .map((list) => ({
+      issue_type: list[0].issue_type,
+      title: list[0].title,
+      severity: list[0].severity,
+      count: list.length,
+      suggested_action: list[0].suggested_action,
+    }))
+    .sort(
+      (a, b) =>
+        SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity] || b.count - a.count,
+    )
+}
 
 function formatApiError(err: unknown): string {
   if (typeof err === 'object' && err !== null && 'response' in err) {
@@ -49,6 +81,8 @@ export function OptimizationAssistantPanel({
 
   const canSend = useMemo(() => draft.trim().length > 0 && !chat.isPending, [draft, chat.isPending])
 
+  const groupedIssues = useMemo(() => groupIssuesByType(issues), [issues])
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, chat.isPending])
@@ -71,15 +105,19 @@ export function OptimizationAssistantPanel({
       <h2>Optimization Assistant</h2>
       <div>
         <h3>Detected Issues</h3>
-        {issues.length === 0 ? (
+        {groupedIssues.length === 0 ? (
           <p className="hint">No issues detected yet.</p>
         ) : (
-          <ul className="issues">
-            {issues.map((issue) => (
-              <li key={issue.id}>
-                <strong>{issue.title}</strong>
-                <p>{issue.description}</p>
-                <p className="hint">Suggestion: {issue.suggested_action}</p>
+          <ul className="issues issues--grouped">
+            {groupedIssues.map((g) => (
+              <li key={g.issue_type}>
+                <div className="issues__row">
+                  <strong>{g.title}</strong>
+                  <span className="issues__count" title="How many times this pattern was detected">
+                    {g.count} {g.count === 1 ? 'occurrence' : 'occurrences'}
+                  </span>
+                </div>
+                <p className="hint issues__suggestion">Suggestion: {g.suggested_action}</p>
               </li>
             ))}
           </ul>
@@ -92,7 +130,11 @@ export function OptimizationAssistantPanel({
             {llmUsed ? 'Last preview used OpenRouter (LLM).' : 'Last preview used local deterministic rewrite (set OPENROUTER_API_KEY in backend/.env for LLM).'}
           </p>
         )}
-        <p>{explanation ?? 'Preview optimization to view generated suggestion.'}</p>
+        {explanation?.trim() ? (
+          <div className="markdown-explanation optimization-explanation">{renderSimpleMarkdown(explanation)}</div>
+        ) : (
+          <p className="hint">Preview optimization to view generated suggestion.</p>
+        )}
       </div>
 
       <div className="chat-section">

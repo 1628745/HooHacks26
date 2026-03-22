@@ -344,6 +344,20 @@ body {
   color: #334155;
 }
 
+.optimization-explanation {
+  margin-top: 4px;
+}
+
+.optimization-explanation .explanation-h2:first-child,
+.optimization-explanation .explanation-h3:first-child,
+.optimization-explanation .explanation-h4:first-child {
+  margin-top: 0;
+}
+
+.optimization-explanation .explanation-block:last-child > :last-child {
+  margin-bottom: 0;
+}
+
 .explanation-source {
   margin-bottom: 8px !important;
 }
@@ -354,6 +368,36 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.issues--grouped {
+  list-style: disc;
+}
+
+.issues__row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.issues__row strong {
+  flex: 1;
+  min-width: 0;
+}
+
+.issues__count {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.issues__suggestion {
+  margin-top: 4px !important;
+  margin-bottom: 0 !important;
 }
 
 .actions {
