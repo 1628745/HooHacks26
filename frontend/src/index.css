@@ -87,15 +87,30 @@ body {
   margin-top: 8px;
   padding: 8px 10px;
   border-radius: 8px;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #b91c1c;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
   font-size: 12px;
   line-height: 1.45;
-  max-height: 160px;
+  max-height: 200px;
   overflow-y: auto;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.optimize-panel-log__line {
+  margin: 2px 0;
+}
+
+.optimize-panel-log__line--info {
+  color: #64748b;
+}
+
+.optimize-panel-log__line--ok {
+  color: #15803d;
+}
+
+.optimize-panel-log__line--error {
+  color: #b91c1c;
 }
 
 button {

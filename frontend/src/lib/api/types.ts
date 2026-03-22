@@ -64,6 +64,12 @@ export type OptimizeResponse = {
   optimization_event_log?: string[]
 }
 
+/** One line in the left-panel optimization progress list (streaming + final errors). */
+export type OptimizePanelEntry = {
+  level: 'info' | 'ok' | 'error'
+  line: string
+}
+
 export type ChatMessage = {
   role: 'user' | 'assistant' | 'system'
   content: string

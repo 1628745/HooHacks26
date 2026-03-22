@@ -1,4 +1,5 @@
 import { useMutation } from '@tanstack/react-query'
+import { useState } from 'react'
 
 import { ThreePanelLayout } from './layout/ThreePanelLayout'
 import { OptimizationAssistantPanel } from '../features/assistant/OptimizationAssistantPanel'
@@ -7,35 +8,59 @@ import { DiffPreviewModal } from '../features/diff/DiffPreviewModal'
 import { PipelineGraphPanel } from '../features/graph/PipelineGraphPanel'
 import { MetricsBar } from '../features/metrics/MetricsBar'
 import { FileUploadPanel } from '../features/upload/FileUploadPanel'
-import { analyzePipeline, linesFromOptimizeAxiosError, optimizePipeline } from '../lib/api/client'
+import {
+  analyzePipeline,
+  axiosErrorToEntries,
+  fatalDetailToEntries,
+  optimizePipelineStream,
+} from '../lib/api/client'
 import { usePipelineStore } from '../lib/state/usePipelineStore'
 
 export default function App() {
   const store = usePipelineStore()
+  const [optimizePending, setOptimizePending] = useState(false)
 
   const analyze = useMutation({
     mutationFn: analyzePipeline,
     onSuccess: (data) => {
       store.setAnalysis(data)
       store.setOptimization(null)
-      store.setOptimizePanelLog([])
+      store.setOptimizePanelEntries([])
     },
   })
 
-  const optimize = useMutation({
-    mutationFn: optimizePipeline,
-    onMutate: () => {
-      store.setOptimizePanelLog([])
-    },
-    onSuccess: (data) => {
-      store.setOptimization(data)
-      store.setOptimizePanelLog(data.optimization_event_log ?? [])
-      store.setShowDiff(true)
-    },
-    onError: (err) => {
-      store.setOptimizePanelLog(linesFromOptimizeAxiosError(err))
-    },
-  })
+  const runOptimize = async () => {
+    if (!store.analysis) {
+      return
+    }
+    setOptimizePending(true)
+    store.setOptimizePanelEntries([])
+    try {
+      await optimizePipelineStream(
+        {
+          file_name: store.fileName,
+          original_code: store.currentCode,
+          ir: store.analysis.ir,
+        },
+        {
+          onLog: (level, message) => {
+            store.setOptimizePanelEntries((prev) => [...prev, { level, line: message }])
+          },
+          onDone: (data) => {
+            store.setOptimization(data)
+            store.setShowDiff(true)
+          },
+          onFatal: (detail) => {
+            store.setOptimizePanelEntries((prev) => [...prev, ...fatalDetailToEntries(detail)])
+          },
+        },
+      )
+    } catch (err) {
+      store.setOptimizePanelEntries((prev) => [...prev, ...axiosErrorToEntries(err)])
+    } finally {
+      setOptimizePending(false)
+    }
+  }
 
   return (
     <>
@@ -49,7 +74,7 @@ export default function App() {
                 store.setCurrentCode(content)
                 store.setAnalysis(null)
                 store.setOptimization(null)
-                store.setOptimizePanelLog([])
+                store.setOptimizePanelEntries([])
               }}
             />
             <CodeEditorPanel value={store.currentCode} onChange={store.setCurrentCode} />
@@ -61,22 +86,21 @@ export default function App() {
                 {analyze.isPending ? 'Analyzing...' : 'Analyze Pipeline'}
               </button>
               <button
-                onClick={() =>
-                  optimize.mutate({
-                    file_name: store.fileName,
-                    original_code: store.currentCode,
-                    ir: store.analysis!.ir,
-                  })
-                }
-                disabled={!store.canPreviewOptimization || optimize.isPending}
+                onClick={() => void runOptimize()}
+                disabled={!store.canPreviewOptimization || optimizePending}
               >
-                {optimize.isPending ? 'Optimizing...' : 'Preview Optimization'}
+                {optimizePending ? 'Optimizing...' : 'Preview Optimization'}
               </button>
             </div>
-            {store.optimizePanelLog.length > 0 ? (
+            {store.optimizePanelEntries.length > 0 ? (
               <div className="optimize-panel-log" role="status" aria-live="polite">
-                {store.optimizePanelLog.map((line, i) => (
-                  <div key={`${i}-${line.slice(0, 40)}`}>{line}</div>
+                {store.optimizePanelEntries.map((entry, i) => (
+                  <div
+                    key={`${i}-${entry.line.slice(0, 48)}`}
+                    className={`optimize-panel-log__line optimize-panel-log__line--${entry.level}`}
+                  >
+                    {entry.line}
+                  </div>
                 ))}
               </div>
             ) : null}

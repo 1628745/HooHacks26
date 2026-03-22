@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import type { AnalyzeResponse, OptimizeResponse } from '../api/types'
+import type { AnalyzeResponse, OptimizePanelEntry, OptimizeResponse } from '../api/types'
 
 const DEFAULT_SAMPLE = `"""
 Default demo pipeline for the LLM Pipeline Optimizer UI.
@@ -125,7 +125,7 @@ export function usePipelineStore() {
   const [analysis, setAnalysis] = useState<AnalyzeResponse | null>(null)
   const [optimization, setOptimization] = useState<OptimizeResponse | null>(null)
   const [showDiff, setShowDiff] = useState(false)
-  const [optimizePanelLog, setOptimizePanelLog] = useState<string[]>([])
+  const [optimizePanelEntries, setOptimizePanelEntries] = useState<OptimizePanelEntry[]>([])
 
   const canPreviewOptimization = useMemo(
     () => Boolean(analysis?.ir.nodes.length),
@@ -146,7 +146,7 @@ export function usePipelineStore() {
     showDiff,
     setShowDiff,
     canPreviewOptimization,
-    optimizePanelLog,
-    setOptimizePanelLog,
+    optimizePanelEntries,
+    setOptimizePanelEntries,
   }
 }

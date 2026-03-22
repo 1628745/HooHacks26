@@ -18,6 +18,7 @@ from app.services.optimizer.llm_prompts import (
 )
 from app.services.optimizer.llm_response_parser import split_explanation_and_code
 from app.services.parser.ast_parser import parse_code
+from app.services.optimizer.emit_types import OptimizeEmitFn, notify_emit
 from app.services.validation.syntax_guard import validate_python_syntax
 
 
@@ -87,16 +88,22 @@ def _validate_step2(data: dict[str, Any], expected_ids: list[str]) -> None:
             raise ValueError("target_llm_call_count must equal len(reduced_calls)")
 
 
-def _finalize_code(optimized_code: str, event_log: list[str]) -> tuple[str, Metrics]:
+def _finalize_code(
+    optimized_code: str,
+    event_log: list[str],
+    emit: OptimizeEmitFn | None = None,
+) -> tuple[str, Metrics]:
     valid, errors = validate_python_syntax(optimized_code)
     if not valid:
         raise ValueError(f"Invalid Python: {'; '.join(errors)}")
     parse_result = parse_code(optimized_code)
     ir_after = build_pipeline_ir(parse_result.tree)
     after = estimate_metrics(ir_after)
-    event_log.append(
+    vline = (
         f"Validation OK — optimized file parses; metrics_after llm_calls={after.llm_calls}"
     )
+    event_log.append(vline)
+    notify_emit(emit, "info", vline)
     return optimized_code, after
 
 
@@ -107,6 +114,7 @@ def run_single_shot_with_repairs(
     ir: PipelineIR,
     issues: list[Issue],
     event_log: list[str],
+    emit: OptimizeEmitFn | None = None,
 ) -> tuple[str, str, Metrics]:
     max_a = settings.optimize_repair_attempts_per_phase
     feedback: str | None = None
@@ -119,17 +127,22 @@ def run_single_shot_with_repairs(
                     + "\n\n---\nPREVIOUS ATTEMPT FAILED. Address this and return valid Python in ```python.\n"
                     + feedback
                 )
-            event_log.append(f"[single-shot] LLM attempt {attempt}/{max_a}")
+            line_start = f"[single-shot] LLM attempt {attempt}/{max_a}"
+            event_log.append(line_start)
+            notify_emit(emit, "info", line_start)
             raw = generate_text_fn(prompt)
             explanation, optimized_code = split_explanation_and_code(raw)
             if not optimized_code:
                 raise ValueError("No parseable ```python block or module in response")
-            oc, after = _finalize_code(optimized_code, event_log)
-            event_log.append(f"[single-shot] Succeeded on attempt {attempt}")
+            oc, after = _finalize_code(optimized_code, event_log, emit=emit)
+            line = f"[single-shot] Succeeded on attempt {attempt}"
+            event_log.append(line)
+            notify_emit(emit, "ok", line)
             return explanation, oc, after
         except Exception as exc:
             msg = f"[single-shot] Attempt {attempt} failed: {exc}"
             event_log.append(msg)
+            notify_emit(emit, "error", msg)
             feedback = str(exc)
     raise OptimizationExhausted(
         f"Single-shot optimization failed after {max_a} attempts",
@@ -145,6 +158,7 @@ def run_multistep_with_repairs(
     issues: list[Issue],
     event_log: list[str],
     llm_ids: list[str],
+    emit: OptimizeEmitFn | None = None,
 ) -> tuple[str, str, Metrics]:
     max_a = settings.optimize_repair_attempts_per_phase
 
@@ -156,15 +170,21 @@ def run_multistep_with_repairs(
             prompt = build_multistep_step1_call_purposes_prompt(
                 file_name, original_code, ir, issues, llm_ids, repair_note=feedback
             )
-            event_log.append(f"[step 1 — call purposes] LLM attempt {attempt}/{max_a}")
+            line_start = f"[step 1 — call purposes] LLM attempt {attempt}/{max_a}"
+            event_log.append(line_start)
+            notify_emit(emit, "info", line_start)
             raw = generate_text_fn(prompt)
             purposes_obj = extract_json_object(raw)
             _validate_step1(purposes_obj, llm_ids)
             purposes_raw = json.dumps(purposes_obj, indent=2)
-            event_log.append(f"[step 1] Succeeded on attempt {attempt}")
+            line = f"[step 1] Succeeded on attempt {attempt}"
+            event_log.append(line)
+            notify_emit(emit, "ok", line)
             break
         except Exception as exc:
-            event_log.append(f"[step 1] Attempt {attempt} failed: {exc}")
+            msg = f"[step 1] Attempt {attempt} failed: {exc}"
+            event_log.append(msg)
+            notify_emit(emit, "error", msg)
             feedback = str(exc)
     else:
         raise OptimizationExhausted(
@@ -182,15 +202,21 @@ def run_multistep_with_repairs(
             prompt = build_multistep_step2_reduced_calls_prompt(
                 file_name, purposes_raw, ir, issues, llm_ids, repair_note=feedback
             )
-            event_log.append(f"[step 2 — reduced calls] LLM attempt {attempt}/{max_a}")
+            line_start = f"[step 2 — reduced calls] LLM attempt {attempt}/{max_a}"
+            event_log.append(line_start)
+            notify_emit(emit, "info", line_start)
             raw = generate_text_fn(prompt)
             reduced_obj = extract_json_object(raw)
             _validate_step2(reduced_obj, llm_ids)
             reduced_raw = json.dumps(reduced_obj, indent=2)
-            event_log.append(f"[step 2] Succeeded on attempt {attempt}")
+            line = f"[step 2] Succeeded on attempt {attempt}"
+            event_log.append(line)
+            notify_emit(emit, "ok", line)
             break
         except Exception as exc:
-            event_log.append(f"[step 2] Attempt {attempt} failed: {exc}")
+            msg = f"[step 2] Attempt {attempt} failed: {exc}"
+            event_log.append(msg)
+            notify_emit(emit, "error", msg)
             feedback = str(exc)
     else:
         raise OptimizationExhausted(
@@ -210,16 +236,22 @@ def run_multistep_with_repairs(
                 reduced_raw,
                 repair_note=feedback,
             )
-            event_log.append(f"[step 3 — rewrite code] LLM attempt {attempt}/{max_a}")
+            line_start = f"[step 3 — rewrite code] LLM attempt {attempt}/{max_a}"
+            event_log.append(line_start)
+            notify_emit(emit, "info", line_start)
             raw = generate_text_fn(prompt)
             explanation, optimized_code = split_explanation_and_code(raw)
             if not optimized_code:
                 raise ValueError("No parseable ```python block or module in response")
-            oc, after = _finalize_code(optimized_code, event_log)
-            event_log.append(f"[step 3] Succeeded on attempt {attempt}")
+            oc, after = _finalize_code(optimized_code, event_log, emit=emit)
+            line = f"[step 3] Succeeded on attempt {attempt}"
+            event_log.append(line)
+            notify_emit(emit, "ok", line)
             return explanation, oc, after
         except Exception as exc:
-            event_log.append(f"[step 3] Attempt {attempt} failed: {exc}")
+            msg = f"[step 3] Attempt {attempt} failed: {exc}"
+            event_log.append(msg)
+            notify_emit(emit, "error", msg)
             feedback = str(exc)
 
     raise OptimizationExhausted(
@@ -236,25 +268,26 @@ def run_llm_optimize(
     issues: list[Issue],
     metrics_before: Metrics,
     event_log: list[str],
+    emit: OptimizeEmitFn | None = None,
 ) -> tuple[str, str, Metrics]:
     threshold = settings.optimize_single_shot_llm_call_threshold
     llm_ids = _llm_node_ids(ir)
     use_single = metrics_before.llm_calls <= threshold or not llm_ids
     if use_single:
         if not llm_ids:
-            event_log.append(
-                "No llm_call nodes in IR — using single-shot optimizer (cannot partition for multi-step)."
-            )
+            p = "No llm_call nodes in IR — using single-shot optimizer (cannot partition for multi-step)."
+            event_log.append(p)
+            notify_emit(emit, "info", p)
         else:
-            event_log.append(
-                f"Using single-shot optimizer (llm_calls={metrics_before.llm_calls} <= threshold={threshold})."
-            )
+            p = f"Using single-shot optimizer (llm_calls={metrics_before.llm_calls} <= threshold={threshold})."
+            event_log.append(p)
+            notify_emit(emit, "info", p)
         return run_single_shot_with_repairs(
-            generate_text_fn, file_name, original_code, ir, issues, event_log
+            generate_text_fn, file_name, original_code, ir, issues, event_log, emit=emit
         )
-    event_log.append(
-        f"Using three-step optimizer (llm_calls={metrics_before.llm_calls} > threshold={threshold})."
-    )
+    p = f"Using three-step optimizer (llm_calls={metrics_before.llm_calls} > threshold={threshold})."
+    event_log.append(p)
+    notify_emit(emit, "info", p)
     return run_multistep_with_repairs(
-        generate_text_fn, file_name, original_code, ir, issues, event_log, llm_ids
+        generate_text_fn, file_name, original_code, ir, issues, event_log, llm_ids, emit=emit
     )
