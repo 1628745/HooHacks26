@@ -24,7 +24,6 @@ export default function App() {
     onSuccess: (data) => {
       store.setAnalysis(data)
       store.setOptimization(null)
-      store.setOptimizedFromCode(null)
       store.setOptimizePanelEntries([])
     },
   })
@@ -33,7 +32,6 @@ export default function App() {
     if (!store.analysis) {
       return
     }
-    const baselineCode = store.currentCode
     setOptimizePending(true)
     store.setOptimizePanelEntries([])
     try {
@@ -49,7 +47,6 @@ export default function App() {
           },
           onDone: (data) => {
             store.setOptimization(data)
-            store.setOptimizedFromCode(baselineCode)
             store.setShowDiff(true)
           },
           onFatal: (detail) => {
@@ -76,7 +73,6 @@ export default function App() {
                 store.setCurrentCode(content)
                 store.setAnalysis(null)
                 store.setOptimization(null)
-                store.setOptimizedFromCode(null)
                 store.setOptimizePanelEntries([])
               }}
             />
@@ -114,12 +110,6 @@ export default function App() {
             fileName={store.fileName}
             isAnalyzePending={analyze.isPending}
             hasAnalysis={Boolean(store.analysis)}
-            leftCode={
-              store.optimization && store.optimizedFromCode != null
-                ? store.optimizedFromCode
-                : store.currentCode
-            }
-            rightCode={store.optimization?.optimized_code ?? store.currentCode}
             hasOptimizationPreview={Boolean(store.optimization)}
             metricsBefore={store.optimization?.metrics_before ?? store.analysis?.metrics_before}
             metricsAfter={store.optimization?.metrics_after}
@@ -139,7 +129,6 @@ export default function App() {
             onApplyCode={(code) => {
               store.setCurrentCode(code)
               store.setOptimization(null)
-              store.setOptimizedFromCode(null)
               store.setAnalysis(null)
             }}
           />

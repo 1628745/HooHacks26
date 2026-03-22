@@ -6,10 +6,6 @@ type Props = {
   fileName: string
   isAnalyzePending: boolean
   hasAnalysis: boolean
-  /** Code shown on the left (pre-optimization snapshot when a preview exists). */
-  leftCode: string
-  /** Code shown on the right (optimized output when a preview exists). */
-  rightCode: string
   hasOptimizationPreview: boolean
   metricsBefore: Metrics | undefined
   metricsAfter: Metrics | undefined
@@ -71,8 +67,6 @@ export function PipelineCenterPanel({
   fileName,
   isAnalyzePending,
   hasAnalysis,
-  leftCode,
-  rightCode,
   hasOptimizationPreview,
   metricsBefore,
   metricsAfter,
@@ -87,13 +81,13 @@ export function PipelineCenterPanel({
 
   return (
     <div className="center-panel stack">
-      <h2 className="center-panel__title">Analysis & comparison</h2>
+      <h2 className="center-panel__title">Metrics &amp; call stack</h2>
 
       {isAnalyzePending ? (
         <p className="hint">Analyzing pipeline…</p>
       ) : !hasAnalysis ? (
         <p className="hint">
-          Click <strong>Analyze Pipeline</strong> to load metrics, invoke sites, and this comparison view.
+          Click <strong>Analyze Pipeline</strong> to load estimated metrics and the call-stack list.
         </p>
       ) : (
         <>
@@ -176,25 +170,6 @@ export function PipelineCenterPanel({
                 </tr>
               </tbody>
             </table>
-          </section>
-
-          <section className="code-compare" aria-label="Source comparison">
-            <div className="code-compare__headers">
-              <div className="code-compare__head">
-                {hasOptimizationPreview ? 'Before optimization' : 'Current source'}
-              </div>
-              <div className="code-compare__head">
-                {hasOptimizationPreview ? 'Optimized preview' : 'Same file (no preview yet)'}
-              </div>
-            </div>
-            <div className="code-compare__panes">
-              <pre className="code-compare__pre">
-                <code>{leftCode}</code>
-              </pre>
-              <pre className="code-compare__pre">
-                <code>{rightCode}</code>
-              </pre>
-            </div>
           </section>
 
           <section className="call-stack-section" aria-label="LLM invoke sites">

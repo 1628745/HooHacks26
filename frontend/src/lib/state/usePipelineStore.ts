@@ -124,8 +124,6 @@ export function usePipelineStore() {
   const [currentCode, setCurrentCode] = useState(DEFAULT_SAMPLE)
   const [analysis, setAnalysis] = useState<AnalyzeResponse | null>(null)
   const [optimization, setOptimization] = useState<OptimizeResponse | null>(null)
-  /** Snapshot of `currentCode` when an optimization run completed — used for center-panel before/after. */
-  const [optimizedFromCode, setOptimizedFromCode] = useState<string | null>(null)
   const [showDiff, setShowDiff] = useState(false)
   const [optimizePanelEntries, setOptimizePanelEntries] = useState<OptimizePanelEntry[]>([])
 
@@ -145,8 +143,6 @@ export function usePipelineStore() {
     setAnalysis,
     optimization,
     setOptimization,
-    optimizedFromCode,
-    setOptimizedFromCode,
     showDiff,
     setShowDiff,
     canPreviewOptimization,
