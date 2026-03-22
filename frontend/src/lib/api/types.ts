@@ -61,6 +61,7 @@ export type OptimizeResponse = {
   metrics_after: Metrics
   diff_hunks: string[]
   llm_used?: boolean
+  optimization_event_log?: string[]
 }
 
 export type ChatMessage = {

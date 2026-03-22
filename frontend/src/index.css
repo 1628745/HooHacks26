@@ -83,6 +83,21 @@ body {
   gap: 10px;
 }
 
+.optimize-panel-log {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  font-size: 12px;
+  line-height: 1.45;
+  max-height: 160px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 button {
   border: 1px solid #cbd5e1;
   border-radius: 8px;

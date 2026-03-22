@@ -1,4 +1,4 @@
-import axios from 'axios'
+import axios, { isAxiosError } from 'axios'
 import type {
   AnalyzeRequest,
   AnalyzeResponse,
@@ -23,6 +23,35 @@ export async function analyzePipeline(payload: AnalyzeRequest): Promise<AnalyzeR
 export async function optimizePipeline(payload: OptimizeRequest): Promise<OptimizeResponse> {
   const { data } = await api.post<OptimizeResponse>('/api/pipeline/optimize', payload)
   return data
+}
+
+/** Lines to show under the optimize buttons when a request fails (502, network, etc.). */
+export function linesFromOptimizeAxiosError(err: unknown): string[] {
+  if (!isAxiosError(err)) {
+    return [err instanceof Error ? err.message : String(err)]
+  }
+  const raw = err.response?.data as { detail?: unknown } | undefined
+  const d = raw?.detail
+  if (typeof d === 'string') {
+    return [d]
+  }
+  if (Array.isArray(d)) {
+    return d.map((x) => String(x))
+  }
+  if (d && typeof d === 'object') {
+    const o = d as { message?: string; optimization_event_log?: string[] }
+    const lines: string[] = []
+    if (o.optimization_event_log?.length) {
+      lines.push(...o.optimization_event_log)
+    }
+    if (o.message) {
+      lines.push(o.message)
+    }
+    if (lines.length) {
+      return lines
+    }
+  }
+  return [err.message || 'Optimization request failed']
 }
 
 export async function validateCode(code: string): Promise<ValidateResponse> {

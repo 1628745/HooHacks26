@@ -66,6 +66,10 @@ class OptimizeResponse(BaseModel):
     metrics_after: Metrics
     diff_hunks: list[str]
     llm_used: bool = False
+    optimization_event_log: list[str] = Field(
+        default_factory=list,
+        description="Chronological messages: failed attempts and success markers during optimization.",
+    )
 
 
 class ChatMessage(BaseModel):

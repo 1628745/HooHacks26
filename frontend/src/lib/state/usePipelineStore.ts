@@ -125,6 +125,7 @@ export function usePipelineStore() {
   const [analysis, setAnalysis] = useState<AnalyzeResponse | null>(null)
   const [optimization, setOptimization] = useState<OptimizeResponse | null>(null)
   const [showDiff, setShowDiff] = useState(false)
+  const [optimizePanelLog, setOptimizePanelLog] = useState<string[]>([])
 
   const canPreviewOptimization = useMemo(
     () => Boolean(analysis?.ir.nodes.length),
@@ -145,5 +146,7 @@ export function usePipelineStore() {
     showDiff,
     setShowDiff,
     canPreviewOptimization,
+    optimizePanelLog,
+    setOptimizePanelLog,
   }
 }

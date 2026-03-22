@@ -24,5 +24,10 @@ class Settings(BaseSettings):
     openrouter_http_referer: str = ""
     openrouter_app_title: str = "LLM Pipeline Optimizer"
 
+    # Optimization: pipelines with this many LLM calls or fewer use one combined prompt + repair loop.
+    optimize_single_shot_llm_call_threshold: int = 4
+    # Max model calls per phase (step 1 JSON, step 2 JSON, step 3 code) before giving up.
+    optimize_repair_attempts_per_phase: int = 25
+
 
 settings = Settings()

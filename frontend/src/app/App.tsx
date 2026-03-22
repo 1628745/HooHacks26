@@ -7,7 +7,7 @@ import { DiffPreviewModal } from '../features/diff/DiffPreviewModal'
 import { PipelineGraphPanel } from '../features/graph/PipelineGraphPanel'
 import { MetricsBar } from '../features/metrics/MetricsBar'
 import { FileUploadPanel } from '../features/upload/FileUploadPanel'
-import { analyzePipeline, optimizePipeline } from '../lib/api/client'
+import { analyzePipeline, linesFromOptimizeAxiosError, optimizePipeline } from '../lib/api/client'
 import { usePipelineStore } from '../lib/state/usePipelineStore'
 
 export default function App() {
@@ -18,14 +18,22 @@ export default function App() {
     onSuccess: (data) => {
       store.setAnalysis(data)
       store.setOptimization(null)
+      store.setOptimizePanelLog([])
     },
   })
 
   const optimize = useMutation({
     mutationFn: optimizePipeline,
+    onMutate: () => {
+      store.setOptimizePanelLog([])
+    },
     onSuccess: (data) => {
       store.setOptimization(data)
+      store.setOptimizePanelLog(data.optimization_event_log ?? [])
       store.setShowDiff(true)
+    },
+    onError: (err) => {
+      store.setOptimizePanelLog(linesFromOptimizeAxiosError(err))
     },
   })
 
@@ -41,6 +49,7 @@ export default function App() {
                 store.setCurrentCode(content)
                 store.setAnalysis(null)
                 store.setOptimization(null)
+                store.setOptimizePanelLog([])
               }}
             />
             <CodeEditorPanel value={store.currentCode} onChange={store.setCurrentCode} />
@@ -64,6 +73,13 @@ export default function App() {
                 {optimize.isPending ? 'Optimizing...' : 'Preview Optimization'}
               </button>
             </div>
+            {store.optimizePanelLog.length > 0 ? (
+              <div className="optimize-panel-log" role="status" aria-live="polite">
+                {store.optimizePanelLog.map((line, i) => (
+                  <div key={`${i}-${line.slice(0, 40)}`}>{line}</div>
+                ))}
+              </div>
+            ) : null}
           </div>
         }
         middle={<PipelineGraphPanel ir={store.analysis?.ir ?? null} issues={store.analysis?.issues ?? []} />}

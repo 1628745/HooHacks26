@@ -16,8 +16,7 @@ from app.services.extractor.pipeline_ir_builder import build_pipeline_ir
 from app.services.generator.code_rewriter import rewrite_code
 from app.services.metrics.estimator import estimate_metrics
 from app.services.optimizer.llm_optimizer import build_optimization_explanation
-from app.services.optimizer.llm_prompts import build_optimize_prompt
-from app.services.optimizer.llm_response_parser import split_explanation_and_code
+from app.services.optimizer.multi_step_optimize import OptimizationExhausted, run_llm_optimize
 from app.services.parser.ast_parser import parse_code
 from app.services.llm.openrouter_client import OpenRouterError, generate_text, openrouter_configured
 from app.services.validation.syntax_guard import validate_python_syntax
@@ -59,61 +58,52 @@ def optimize_pipeline(payload: OptimizeRequest) -> OptimizeResponse:
     before = estimate_metrics(payload.ir)
     _opt_log(f"Step A: detect_issues → {len(issues)} issues; metrics_before llm_calls={before.llm_calls}")
 
+    event_log: list[str] = []
+
     if openrouter_configured():
-        _opt_log("Step B: OpenRouter is configured — using LLM path")
+        _opt_log("Step B: OpenRouter is configured — using LLM path (multi-step or single-shot)")
         try:
-            _opt_log("Step C: Building optimize prompt via build_optimize_prompt() ...")
-            prompt = build_optimize_prompt(
+            explanation, optimized_code, after = run_llm_optimize(
+                generate_text,
                 payload.file_name,
                 payload.original_code,
                 payload.ir,
                 issues,
+                before,
+                event_log,
             )
-            _opt_log(f"Step D: Prompt built, length={len(prompt)} chars")
-
-            _opt_log("Step E: Calling generate_text() (OpenRouter) — see [openrouter] logs below")
-            raw = generate_text(prompt)
-            _opt_log(f"Step F: generate_text returned; raw length={len(raw)}")
-            _opt_log(f"Step G: Raw model text preview (first 1500 chars):\n{raw[:1500]!s}")
-
-            _opt_log("Step H: split_explanation_and_code() ...")
-            explanation, optimized_code = split_explanation_and_code(raw)
-            _opt_log(
-                f"Step I: split result — has optimized_code={optimized_code is not None}, "
-                f"explanation length={len(explanation) if explanation else 0}"
-            )
-            if optimized_code:
-                _opt_log(f"Step J: optimized_code length={len(optimized_code)}, preview:\n{optimized_code[:800]!s}")
-            if not optimized_code:
-                _opt_log("Step FAIL: No parseable Python from model response")
-                raise HTTPException(
-                    status_code=502,
-                    detail="Model did not return parseable Python. Ensure the model outputs a ```python block or raw valid Python.",
-                )
-            _opt_log("Step K: validate_python_syntax(optimized_code) ...")
-            valid, errors = validate_python_syntax(optimized_code)
-            _opt_log(f"Step L: syntax valid={valid}, errors={errors}")
-            if not valid:
-                _opt_log("Step FAIL: Invalid Python from model")
-                raise HTTPException(
-                    status_code=502,
-                    detail=f"Model returned invalid Python: {errors}",
-                )
-            _opt_log("Step M: parse_code + build_pipeline_ir for metrics_after ...")
-            parse_result = parse_code(optimized_code)
-            ir_after = build_pipeline_ir(parse_result.tree)
-            after = estimate_metrics(ir_after)
-            _opt_log(f"Step N: metrics_after llm_calls={after.llm_calls}")
-            diff_hints: list[str] = ["LLM optimization via OpenRouter."]
+            for line in event_log:
+                _opt_log(f"event_log | {line}")
+            diff_hints: list[str] = ["LLM optimization via OpenRouter (repair loops enabled)."]
+        except OptimizationExhausted as exc:
+            _opt_log(f"Step FAIL: OptimizationExhausted: {exc!r}")
+            for line in exc.event_log:
+                _opt_log(f"event_log | {line}")
+            raise HTTPException(
+                status_code=502,
+                detail={
+                    "message": str(exc),
+                    "optimization_event_log": exc.event_log,
+                },
+            ) from exc
         except OpenRouterError as exc:
             _opt_log(f"Step FAIL: OpenRouterError: {exc!r}")
             _opt_log(traceback.format_exc())
+            if event_log:
+                raise HTTPException(
+                    status_code=502,
+                    detail={
+                        "message": str(exc),
+                        "optimization_event_log": event_log,
+                    },
+                ) from exc
             raise HTTPException(status_code=502, detail=str(exc)) from exc
         llm_used = True
         issues_applied_ids = [i.id for i in issues] if issues else ["llm-optimize"]
         _opt_log("========== POST /api/pipeline/optimize LLM path DONE (returning 200) ==========")
     else:
         _opt_log("OpenRouter NOT configured — deterministic rewrite path (no LLM call)")
+        event_log.append("Deterministic rewrite path (OpenRouter not configured).")
         optimized_code, diff_hints = rewrite_code(payload.original_code, issues)
         valid, errors = validate_python_syntax(optimized_code)
         if not valid:
@@ -153,6 +143,7 @@ def optimize_pipeline(payload: OptimizeRequest) -> OptimizeResponse:
         metrics_after=after,
         diff_hunks=diff_hunks,
         llm_used=llm_used,
+        optimization_event_log=event_log,
     )
 
 
